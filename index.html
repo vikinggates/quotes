@@ -130,6 +130,11 @@ input:focus-visible,select:focus-visible,textarea:focus-visible,button:focus-vis
 
   <!-- QUOTE -->
   <section class="panel" id="p-quote">
+    <div class="block" id="connectBanner" hidden>
+      <h2>Connect to the quote sheet</h2>
+      <p class="hint">Paste the setup link you were texted, then tap Connect. You only do this once.</p>
+      <div class="row" style="flex-wrap:nowrap"><input id="bn-link" placeholder="Paste setup link" autocomplete="off" autocapitalize="off" spellcheck="false"><button class="btn solid" id="bn-go">Connect</button></div>
+    </div>
     <div class="example" id="exampleNote" hidden>
       <span>Example: a 20 ft oversized double swing with one solar opener.</span>
       <button class="btn small" id="clearExample">Start blank</button>
@@ -644,9 +649,9 @@ $("cn-connect").onclick = async ()=>{
   const url = $("cn-url").value.trim(), key = $("cn-key").value.trim();
   if(url && !/^https:\/\/script\.google\.com\/macros\/s\/[^/]+\/exec/.test(url)){ toast("That isn't a Google Apps Script web app URL. It should end in /exec."); return; }
   const old = CONN; CONN = {url, key};
-  if(!url){ LS.set(K.conn,CONN); renderConn(); syncLabel(); toast("Disconnected"); return; }
+  if(!url){ LS.set(K.conn,CONN); renderConn(); showBanner(); syncLabel(); toast("Disconnected"); return; }
   const ok = await pull(false);
-  if(ok){ LS.set(K.conn,CONN); renderConn(); toast("Connected to the Google Sheet"); }
+  if(ok){ LS.set(K.conn,CONN); renderConn(); showBanner(); toast("Connected to the Google Sheet"); }
   else { CONN = old; renderConn(); toast("Couldn't connect. Check the URL and passcode."); }
 };
 function setupLink(){
@@ -654,16 +659,29 @@ function setupLink(){
   return location.origin + location.pathname + "#connect=" + code;
 }
 $("cn-link").onclick = ()=>copyOrShow(setupLink(), "cn-linkbox", "Setup link copied. Text it to Dan.");
-function readSetupLink(){
-  const m = location.hash.match(/connect=([A-Za-z0-9_-]+)/); if(!m) return false;
+function parseSetup(text){
+  const m = String(text||"").match(/connect=([A-Za-z0-9_-]+)/); if(!m) return null;
   try{
     const s = m[1].replace(/-/g,"+").replace(/_/g,"/");
     const c = JSON.parse(atob(s + "===".slice((s.length+3)%4)));
-    if(c && c.url){ CONN = {url:c.url, key:c.key||""}; LS.set(K.conn,CONN); }
-  }catch(e){}
+    return (c && c.url) ? {url:c.url, key:c.key||""} : null;
+  }catch(e){ return null; }
+}
+function readSetupLink(){
+  if(!/connect=/.test(location.hash)) return false;
+  const c = parseSetup(location.hash); if(c){ CONN = c; LS.set(K.conn,CONN); }
   history.replaceState(null, "", location.pathname);
   return true;
 }
+function showBanner(){ $("connectBanner").hidden = !!CONN.url; }
+$("bn-go").onclick = async ()=>{
+  const c = parseSetup($("bn-link").value.trim());
+  if(!c){ toast("That doesn't look like a setup link. Copy the whole link from the text."); return; }
+  const old = CONN; CONN = c;
+  const ok = await pull(false);
+  if(ok){ LS.set(K.conn,CONN); showBanner(); $("bn-link").value=""; toast("Connected to the Viking Gates quote sheet"); }
+  else { CONN = old; toast("Couldn't reach the sheet. Check your signal and try again."); }
+};
 
 /* ---------- tabs, toast ---------- */
 function showTab(t){
@@ -679,7 +697,7 @@ let tt=null; function toast(m){ const el=$("toast"); el.textContent=m; el.hidden
 $("logoL").src = LOGO_BLACK; $("logoD").src = LOGO_WHITE;
 const fromLink = readSetupLink();
 Q = LS.get(K.draft) || exampleQuote();
-renderCatalog(); bindCustomer(); renderLines(); renderSaved(); syncLabel();
+renderCatalog(); bindCustomer(); renderLines(); renderSaved(); syncLabel(); showBanner();
 pull(false).then(ok=>{ if(fromLink) toast(ok?"Connected to the Viking Gates quote sheet":"Setup link saved, but the sheet didn't answer. Try ↻ later."); });
 document.addEventListener("visibilitychange", ()=>{ if(document.visibilityState==="visible") pull(false); });
 })();
