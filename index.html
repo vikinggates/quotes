@@ -114,6 +114,14 @@ input:focus-visible,select:focus-visible,textarea:focus-visible,button:focus-vis
 .check th:first-child,.check td:first-child{text-align:left}
 .check th{font-size:.72rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:600}
 .toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(92px + env(safe-area-inset-bottom,0px));background:var(--ink);color:var(--bg);padding:9px 16px;border-radius:999px;font-size:.9rem;z-index:9;max-width:90vw;text-align:center}
+.addr{display:flex;flex-direction:column;gap:4px;font-size:.8rem;color:var(--muted)}
+.addrrow{display:flex;gap:8px;align-items:center}
+.addrwrap{position:relative;flex:1;min-width:0}
+.sugg{position:absolute;left:0;right:0;top:calc(100% + 4px);margin:0;padding:4px 0;list-style:none;background:var(--surface);border:1px solid var(--line);border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,.18);z-index:20;max-height:260px;overflow:auto}
+.sugg li{padding:10px 12px;font-size:.95rem;color:var(--ink);cursor:pointer}
+.sugg li[aria-selected="true"],.sugg li:hover{background:var(--bg)}
+.sugg li small{display:block;color:var(--muted);font-size:.78rem}
+.sugg .credit{font-size:.7rem;color:var(--muted);text-align:right;padding:4px 10px 2px;cursor:default}
 .copybox{width:100%;min-height:120px;font-family:ui-monospace,Menlo,monospace;font-size:13px}
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
 </style>
@@ -155,7 +163,9 @@ input:focus-visible,select:focus-visible,textarea:focus-visible,button:focus-vis
         <label class="f">Email<input id="c-email" inputmode="email" autocomplete="off"></label>
         <label class="f">Status<select id="c-status"><option>Draft</option><option>Sent</option><option>Approved</option><option>Won</option><option>Lost</option></select></label>
       </div>
-      <label class="f">Install address<input id="c-address" autocomplete="off"></label>
+      <div class="f addr">Install address
+        <div class="addrrow"><div class="addrwrap"><input id="c-address" autocomplete="street-address" aria-label="Install address" aria-autocomplete="list" aria-controls="addrList" role="combobox" aria-expanded="false"><ul class="sugg" id="addrList" role="listbox" hidden></ul></div><a class="btn small" id="mapBtn" target="_blank" rel="noopener" hidden>Map</a></div>
+      </div>
     </div>
 
     <div class="block">
@@ -237,6 +247,11 @@ input:focus-visible,select:focus-visible,textarea:focus-visible,button:focus-vis
     <div class="row"><button class="btn solid" id="pb-save">Save prices</button><button class="btn" id="pb-reset">Restore starting prices</button></div>
     <p class="hint" id="pb-confirm" hidden>Restore every price to the starting values? <button class="btn small" id="pb-reset-yes">Yes, restore</button> <button class="btn small" id="pb-reset-no">Cancel</button></p>
 
+    <div class="block">
+      <h2>Address lookup</h2>
+      <p class="hint">Paste your Google Maps API key to suggest addresses as you type. Tap Save prices to share it with Dan's phone. Leave it blank to type addresses by hand.</p>
+      <label class="f">Google Maps API key<input id="pb-mapskey" autocomplete="off" autocapitalize="off" spellcheck="false"></label>
+    </div>
     <div class="block">
       <h2>Google Sheet connection</h2>
       <p class="hint" id="connStatus"></p>
@@ -323,7 +338,7 @@ async function pull(showToast){
   try{
     await flushPending();
     const j = await api("load");
-    if(j.prices){ PB = Object.assign(clone(DEFAULT_PB), j.prices); LS.set(K.pb,PB); renderCatalog(); if(!$("p-prices").hidden) renderPB(); }
+    if(j.prices){ PB = Object.assign(clone(DEFAULT_PB), j.prices); LS.set(K.pb,PB); renderCatalog(); if(!$("p-prices").hidden) renderPB(); initAddress(); }
     quotes = (j.quotes||[]).filter(Boolean); LS.set(K.quotes,quotes);
     const fresh = quotes.find(q=>q.number===Q.number);
     if(fresh && fresh.approval && !Q.approval){ Q = clone(fresh); bindCustomer(); renderLines(); toast(`${fresh.approval.name} approved this quote`); }
@@ -385,6 +400,7 @@ function bindCustomer(){
   $("q-discount").value = Q.discount||""; $("q-deposit").value = Q.depositPct; $("q-valid").value = Q.validDays;
   $("q-notes").value = Q.notes||"";
   $("qnum").textContent = Q.number;
+  updateMapBtn();
   $("exampleNote").hidden = !Q.example;
   const ap = Q.approval;
   $("approvedBanner").hidden = !ap;
@@ -488,6 +504,82 @@ $("q-notes").oninput = e=>{Q.notes=e.target.value; persistDraft();};
 $("q-discount").oninput = e=>{Q.discount=num(e.target.value); updateTotals();};
 $("q-deposit").oninput = e=>{Q.depositPct=num(e.target.value); updateTotals();};
 $("q-valid").oninput = e=>{Q.validDays=num(e.target.value); persistDraft();};
+
+/* ---------- address lookup ---------- */
+function updateMapBtn(){
+  const a = (Q.customer.address||"").trim();
+  $("mapBtn").hidden = a.length < 6;
+  $("mapBtn").href = "https://maps.apple.com/?q=" + encodeURIComponent(a);
+}
+const AD = {ready:false, loading:null, key:"", lib:null, token:null, items:[], active:-1, timer:null, seq:0};
+function loadGoogle(key){
+  if(AD.loading && AD.key===key) return AD.loading;
+  AD.key = key;
+  AD.loading = new Promise((resolve, reject)=>{
+    window.__vgMapsReady = ()=>resolve();
+    const sc = document.createElement("script");
+    sc.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(key)}&v=weekly&loading=async&libraries=places&callback=__vgMapsReady`;
+    sc.async = true; sc.onerror = ()=>reject(new Error("load_failed"));
+    document.head.appendChild(sc);
+  }).then(async ()=>{ AD.lib = await google.maps.importLibrary("places"); AD.ready = true; });
+  AD.loading.catch(()=>{ AD.ready=false; });
+  return AD.loading;
+}
+function initAddress(){ if(PB.mapsKey && !AD.loading) loadGoogle(PB.mapsKey).catch(()=>{}); }
+window.gm_authFailure = ()=>{ AD.ready=false; closeSugg(); toast("Address lookup is off: Google rejected the API key. Check it on the Prices tab."); };
+function closeSugg(){ $("addrList").hidden = true; $("c-address").setAttribute("aria-expanded","false"); AD.items=[]; AD.active=-1; }
+function showSugg(){
+  const ul = $("addrList");
+  if(!AD.items.length){ closeSugg(); return; }
+  ul.innerHTML = AD.items.map((it,i)=>`<li role="option" data-i="${i}" aria-selected="${i===AD.active}">${esc(it.main)}${it.sub?`<small>${esc(it.sub)}</small>`:""}</li>`).join("") + `<li class="credit" aria-hidden="true">powered by Google</li>`;
+  ul.hidden = false; $("c-address").setAttribute("aria-expanded","true");
+}
+async function lookup(text){
+  if(!AD.ready) return;
+  const mine = ++AD.seq;
+  if(!AD.token) AD.token = new AD.lib.AutocompleteSessionToken();
+  try{
+    const {suggestions} = await AD.lib.AutocompleteSuggestion.fetchAutocompleteSuggestions({
+      input: text, sessionToken: AD.token, includedRegionCodes: ["us"],
+      locationBias: {center: {lat: 30.48, lng: -90.95}, radius: 50000}
+    });
+    if(mine !== AD.seq) return;
+    AD.items = (suggestions||[]).filter(s=>s.placePrediction).slice(0,5).map(s=>{
+      const p = s.placePrediction;
+      return {pred:p, main:(p.mainText||p.text).toString(), sub:p.secondaryText?p.secondaryText.toString():"", full:p.text.toString()};
+    });
+    AD.active = -1; showSugg();
+  }catch(e){ closeSugg(); }
+}
+async function pickSugg(i){
+  const it = AD.items[i]; if(!it) return;
+  closeSugg();
+  let addr = it.full;
+  try{
+    const place = it.pred.toPlace();
+    await place.fetchFields({fields:["formattedAddress"]});
+    if(place.formattedAddress) addr = place.formattedAddress;
+  }catch(e){}
+  AD.token = null;
+  addr = addr.replace(/,\s*(USA|United States)$/,"");
+  $("c-address").value = addr; Q.customer.address = addr; persistDraft(); updateMapBtn();
+}
+$("c-address").addEventListener("input", e=>{
+  updateMapBtn();
+  const v = e.target.value.trim();
+  clearTimeout(AD.timer);
+  if(!AD.ready || v.length < 4){ closeSugg(); return; }
+  AD.timer = setTimeout(()=>lookup(v), 250);
+});
+$("c-address").addEventListener("keydown", e=>{
+  if($("addrList").hidden) return;
+  if(e.key==="ArrowDown"||e.key==="ArrowUp"){ e.preventDefault(); const n=AD.items.length; AD.active = (AD.active + (e.key==="ArrowDown"?1:-1) + n) % n; showSugg(); }
+  else if(e.key==="Enter" && AD.active>=0){ e.preventDefault(); pickSugg(AD.active); }
+  else if(e.key==="Escape") closeSugg();
+});
+$("addrList").addEventListener("mousedown", e=>e.preventDefault());
+$("addrList").addEventListener("click", e=>{ const li = e.target.closest("li[data-i]"); if(li) pickSugg(+li.dataset.i); });
+$("c-address").addEventListener("blur", ()=>setTimeout(closeSugg, 150));
 
 /* ---------- approval link ---------- */
 function scriptId(){ const m = (CONN.url||"").match(/\/macros\/s\/([^/]+)\/exec/); return m ? m[1] : ""; }
@@ -672,7 +764,7 @@ function renderCheck(){
 }
 function renderPB(){
   for(const id in PB_FIELDS) $(id).value = PB[PB_FIELDS[id]];
-  $("pb-terms").value = PB.terms;
+  $("pb-terms").value = PB.terms; $("pb-mapskey").value = PB.mapsKey || "";
   $("pb-addons").innerHTML = PB.addons.map((it,i)=>`<div class="pbrow">
       <input value="${esc(it.name)}" data-pb="addons" data-i="${i}" data-k="name" aria-label="Name">
       <span class="money">$<input class="num" inputmode="decimal" value="${esc(it.price)}" data-pb="addons" data-i="${i}" data-k="price" aria-label="Price"></span>
@@ -684,6 +776,7 @@ $("p-prices").addEventListener("input", e=>{
   if(k){ const it = PB[k][+t.dataset.i]; it[t.dataset.k] = t.dataset.k==="name" ? t.value : num(t.value); return; }
   if(PB_FIELDS[t.id]){ PB[PB_FIELDS[t.id]] = num(t.value); renderCheck(); }
   if(t.id==="pb-terms") PB.terms = t.value;
+  if(t.id==="pb-mapskey") PB.mapsKey = t.value.trim();
 });
 $("p-prices").addEventListener("click", e=>{
   const d = e.target.closest("[data-pbdel]"); if(d){ PB[d.dataset.pbdel].splice(+d.dataset.i,1); renderPB(); return; }
@@ -691,7 +784,7 @@ $("p-prices").addEventListener("click", e=>{
 });
 $("pb-save").onclick = async ()=>{
   PB.addons = PB.addons.filter(a=>a.name.trim());
-  LS.set(K.pb,PB); renderCatalog(); renderPB();
+  LS.set(K.pb,PB); renderCatalog(); renderPB(); initAddress();
   if(!CONN.url){ toast("Prices saved on this phone"); return; }
   try{ await api("savePrices",{prices:PB}); toast("Prices saved for everyone"); syncLabel(); }
   catch(e){ toast("Couldn't reach the Google Sheet. Saved on this phone only."); }
@@ -759,7 +852,7 @@ $("logoL").src = LOGO_BLACK; $("logoD").src = LOGO_WHITE;
 const fromLink = readSetupLink();
 const savedDraft = LS.get(K.draft);
 Q = (savedDraft && !savedDraft.example) ? savedDraft : blankQuote();
-renderCatalog(); bindCustomer(); renderLines(); renderSaved(); syncLabel(); showBanner();
+renderCatalog(); bindCustomer(); renderLines(); renderSaved(); syncLabel(); showBanner(); initAddress();
 pull(false).then(ok=>{ if(fromLink) toast(ok?"Connected to the Viking Gates quote sheet":"Setup link saved, but the sheet didn't answer. Try ↻ later."); });
 document.addEventListener("visibilitychange", ()=>{ if(document.visibilityState==="visible") pull(false); });
 })();
