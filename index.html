@@ -101,7 +101,9 @@ input:focus-visible,select:focus-visible,textarea:focus-visible,button:focus-vis
 .sitem .n{font-weight:600}
 .sitem .m{font-size:.8rem;color:var(--muted)}
 .pill{display:inline-block;font-size:.7rem;font-weight:600;letter-spacing:.08em;text-transform:uppercase;padding:2px 8px;border-radius:999px;border:1px solid currentColor}
-.pill.Draft{color:var(--muted)}.pill.Sent{color:var(--accent)}.pill.Won{color:var(--ok)}.pill.Lost{color:var(--warn)}
+.pill.Draft{color:var(--muted)}.pill.Sent{color:var(--accent)}.pill.Approved,.pill.Won{color:var(--ok)}.pill.Lost{color:var(--warn)}
+.approved{border-color:var(--ok)}
+.approved h2{color:var(--ok)}
 .pill.wait{color:var(--warn)}
 .pbtable{display:flex;flex-direction:column;gap:8px}
 .pbrow{display:grid;grid-template-columns:1fr 120px auto;gap:8px;align-items:center}
@@ -140,13 +142,18 @@ input:focus-visible,select:focus-visible,textarea:focus-visible,button:focus-vis
       <button class="btn small" id="clearExample">Start blank</button>
     </div>
 
+    <div class="block approved" id="approvedBanner" hidden>
+      <h2>Approved by the customer</h2>
+      <p class="hint" id="approvedText"></p>
+      <div class="row"><button class="btn solid" id="dupQuote">Duplicate to make changes</button><button class="btn" id="resendPdf">Send PDF again</button></div>
+    </div>
     <div class="block">
       <div class="blockhead"><h2>Customer</h2><span class="label num" id="qnum"></span></div>
       <div class="grid2">
         <label class="f">Name<input id="c-name" autocomplete="off"></label>
         <label class="f">Phone<input id="c-phone" inputmode="tel" autocomplete="off"></label>
         <label class="f">Email<input id="c-email" inputmode="email" autocomplete="off"></label>
-        <label class="f">Status<select id="c-status"><option>Draft</option><option>Sent</option><option>Won</option><option>Lost</option></select></label>
+        <label class="f">Status<select id="c-status"><option>Draft</option><option>Sent</option><option>Approved</option><option>Won</option><option>Lost</option></select></label>
       </div>
       <label class="f">Install address<input id="c-address" autocomplete="off"></label>
     </div>
@@ -179,15 +186,16 @@ input:focus-visible,select:focus-visible,textarea:focus-visible,button:focus-vis
 
     <div class="block">
       <h2>Save and send</h2>
-      <div class="row">
+      <div class="row" id="sendRow">
         <button class="btn solid" id="sendPdf">Send PDF quote</button>
         <button class="btn" id="saveQuote2">Save quote</button>
       </div>
       <div class="row">
+        <button class="btn small" id="copyLink">Copy approval link</button>
         <button class="btn small" id="copyText">Copy as text</button>
         <button class="btn small" id="newQuote">New quote</button>
       </div>
-      <p class="hint">Send opens your phone's share sheet with the PDF attached. Pick Messages or Mail. Sending also saves the quote and marks it Sent.</p>
+      <p class="hint">Send opens your phone's share sheet with the PDF and a link where the customer can review and approve the quote. Pick Messages or Mail. Sending also saves the quote and marks it Sent.</p>
       <textarea class="copybox" id="copyFallback" hidden readonly aria-label="Quote text"></textarea>
     </div>
   </section>
@@ -301,7 +309,11 @@ function syncLabel(){
 }
 async function flushPending(){
   while(pending.length){
-    await api("saveQuote",{quote:pending[0]});
+    try{ await api("saveQuote",{quote:pending[0]}); }
+    catch(e){
+      if(String(e.message)!=="approved_locked") throw e;
+      toast(`${pending[0].customer?.name||pending[0].number} already approved this quote, so the changes weren't saved. Duplicate it to make changes.`);
+    }
     pending.shift(); LS.set(K.pending,pending);
   }
 }
@@ -313,6 +325,8 @@ async function pull(showToast){
     const j = await api("load");
     if(j.prices){ PB = Object.assign(clone(DEFAULT_PB), j.prices); LS.set(K.pb,PB); renderCatalog(); if(!$("p-prices").hidden) renderPB(); }
     quotes = (j.quotes||[]).filter(Boolean); LS.set(K.quotes,quotes);
+    const fresh = quotes.find(q=>q.number===Q.number);
+    if(fresh && fresh.approval && !Q.approval){ Q = clone(fresh); bindCustomer(); renderLines(); toast(`${fresh.approval.name} approved this quote`); }
     syncLabel(); renderSaved(); if(showToast) toast("Up to date");
     return true;
   }catch(e){
@@ -350,7 +364,8 @@ function calc(q){
 
 /* ---------- quote state ---------- */
 function newNumber(){ const d=new Date(), p=n=>String(n).padStart(2,"0"); return `VG-${String(d.getFullYear()).slice(2)}${p(d.getMonth()+1)}${p(d.getDate())}-${p(d.getHours())}${p(d.getMinutes())}${p(d.getSeconds())}`; }
-function blankQuote(){ return {number:newNumber(), createdAt:Date.now(), status:"Draft", customer:{name:"",phone:"",email:"",address:""}, notes:"", lines:[], discount:0, depositPct:PB.deposit, validDays:PB.valid, example:false}; }
+function newToken(){ const a=new Uint8Array(12); crypto.getRandomValues(a); return Array.from(a,b=>b.toString(36).padStart(2,"0")).join("").slice(0,20); }
+function blankQuote(){ return {number:newNumber(), token:newToken(), createdAt:Date.now(), status:"Draft", customer:{name:"",phone:"",email:"",address:""}, notes:"", lines:[], discount:0, depositPct:PB.deposit, validDays:PB.valid, example:false}; }
 function openingLine(o){ const l = Object.assign({id:uid(), kind:"opening", width:PB.std, swing:"double", top:"flat", auto:false, qty:1, override:false}, o||{}); l.unit = openingPrice(l).price; return l; }
 function itemLine(it){ return {id:uid(), kind:"item", name:it.name, desc:it.desc||"", qty:1, unit:num(it.price)}; }
 function exampleQuote(){
@@ -371,6 +386,11 @@ function bindCustomer(){
   $("q-notes").value = Q.notes||"";
   $("qnum").textContent = Q.number;
   $("exampleNote").hidden = !Q.example;
+  const ap = Q.approval;
+  $("approvedBanner").hidden = !ap;
+  if(ap) $("approvedText").textContent = `${ap.name} approved this quote on ${new Date(ap.at).toLocaleString("en-US",{month:"short",day:"numeric",year:"numeric",hour:"numeric",minute:"2-digit"})}. It's locked so it always matches what they approved.`;
+  document.querySelectorAll("#p-quote input, #p-quote select, #p-quote textarea, #lines button, .addbar button").forEach(el=>{ if(!el.closest("#connectBanner")) el.disabled = !!ap; });
+  $("sendRow").hidden = !!ap; $("saveQuote").disabled = !!ap;
 }
 const seg = (f, a, b, val) => `<div class="seg" data-seg="${f}"><button data-v="${a[0]}" aria-pressed="${val===a[0]}">${a[1]}</button><button data-v="${b[0]}" aria-pressed="${val===b[0]}">${b[1]}</button></div>`;
 function renderLines(){
@@ -406,7 +426,9 @@ function renderLines(){
   }).join("");
   updateTotals();
 }
+function lockIfApproved(){ if(Q.approval) document.querySelectorAll("#lines input, #lines button, #lines select").forEach(el=>el.disabled=true); }
 function updateTotals(){
+  lockIfApproved();
   const c = calc(Q);
   $("totals").innerHTML = `
     ${c.disc?`<span>Subtotal</span><span>${money2(c.sub)}</span><span>Discount</span><span>−${money2(c.disc)}</span>`:""}
@@ -467,11 +489,35 @@ $("q-discount").oninput = e=>{Q.discount=num(e.target.value); updateTotals();};
 $("q-deposit").oninput = e=>{Q.depositPct=num(e.target.value); updateTotals();};
 $("q-valid").oninput = e=>{Q.validDays=num(e.target.value); persistDraft();};
 
+/* ---------- approval link ---------- */
+function scriptId(){ const m = (CONN.url||"").match(/\/macros\/s\/([^/]+)\/exec/); return m ? m[1] : ""; }
+function approvalLink(q){
+  q = q || Q;
+  if(!scriptId()) return "";
+  if(!q.token) q.token = newToken();
+  const base = location.origin + location.pathname.replace(/[^/]*$/,"");
+  return `${base}view.html?q=${encodeURIComponent(q.number)}&t=${q.token}&s=${scriptId()}`;
+}
+$("copyLink").onclick = async ()=>{
+  if(!CONN.url){ toast("Connect the Google Sheet first. Approval links need it."); return; }
+  if(!Q.lines.length){ toast("Add at least one item first"); return; }
+  const ok = await saveQuote(true);
+  if(ok) copyOrShow(approvalLink(), "copyFallback", "Approval link copied. Paste it in a text or email.");
+};
+$("dupQuote").onclick = ()=>{
+  const c = clone(Q); delete c.approval; delete c.terms;
+  c.number = newNumber(); c.token = newToken(); c.createdAt = Date.now(); c.updatedAt = null; c.status = "Draft";
+  Q = c; bindCustomer(); renderLines(); window.scrollTo(0,0); toast(`New quote ${Q.number}. Make your changes, then send it.`);
+};
+
 /* ---------- save / load quotes ---------- */
 const lineName = l => l.kind==="opening" ? openingDesc(l) : (l.name||"Custom item");
 const lineSub = l => l.kind==="opening" ? openingSub(l) : (l.desc||"");
 async function saveQuote(quiet){
   if(!Q.lines.length){ toast("Add at least one item first"); return false; }
+  if(Q.approval){ if(!quiet) toast("This quote is approved and locked. Duplicate it to make changes."); return false; }
+  if(!Q.token) Q.token = newToken();
+  Q.terms = PB.terms;
   Q.updatedAt = Date.now(); Q.total = calc(Q).total; Q.example=false;
   Q.lines.forEach(l=>{ l.label = lineName(l); });
   const data = clone(Q);
@@ -571,8 +617,17 @@ function buildPdf(){
   trow("Balance due morning of install", money2(c.balance));
   y += 14;
   const block = (title, text)=>{ if(!text) return; if(y>690){doc.addPage(); y=60;} doc.setFont("helvetica","bold"); doc.setFontSize(8); doc.setTextColor(120); doc.text(title, M, y); y+=13; doc.setFont("helvetica","normal"); doc.setFontSize(9.5); doc.setTextColor(50); const t = doc.splitTextToSize(text, W-2*M); if(y + t.length*12.5 > 720){doc.addPage(); y=60;} doc.text(t, M, y, {lineHeightFactor:1.3}); y += t.length*12.5 + 16; };
+  const link = approvalLink();
+  if(link && !Q.approval){
+    if(y>680){doc.addPage(); y=60;}
+    doc.setFont("helvetica","bold"); doc.setFontSize(10); doc.setTextColor(17);
+    doc.textWithLink("Review and approve this quote online", M, y, {url: link});
+    doc.setDrawColor(17); doc.setLineWidth(.6); doc.line(M, y+2, M+doc.getTextWidth("Review and approve this quote online"), y+2);
+    y += 24;
+  }
+  if(Q.approval){ doc.setFont("helvetica","bold"); doc.setFontSize(10); doc.setTextColor(40,107,69); doc.text(`Approved online by ${Q.approval.name} on ${fd(new Date(Q.approval.at))}`, M, y); y += 24; }
   block("PROJECT NOTES", Q.notes);
-  block("TERMS", PB.terms);
+  block("TERMS", Q.terms || PB.terms);
   if(y > 680){ doc.addPage(); y = 60; }
   y += 24; doc.setDrawColor(120); doc.setLineWidth(.6);
   doc.line(M, y, M+260, y); doc.line(M+300, y, W-M, y);
@@ -586,6 +641,7 @@ function downloadFile(blob, name){
   a.href = url; a.download = name; document.body.appendChild(a); a.click(); a.remove();
   setTimeout(()=>URL.revokeObjectURL(url), 30000);
 }
+$("resendPdf").onclick = ()=>$("sendPdf").onclick();
 $("sendPdf").onclick = async ()=>{
   if(!Q.lines.length){ toast("Add at least one item first"); return; }
   if(!window.jspdf){ toast("PDF tool didn't load. Check the connection or use Copy as text."); return; }
@@ -594,10 +650,15 @@ $("sendPdf").onclick = async ()=>{
   const file = new File([blob], pdfName(), {type:"application/pdf"});
   const prev = Q.status;
   let sent = false;
+  if(!Q.token) Q.token = newToken();
+  const link = Q.approval ? "" : approvalLink();
+  const first = (Q.customer.name||"").trim().split(/\s+/)[0];
+  const msg = `Hi ${first}, here's your quote from Viking Gates.` + (link ? ` You can review and approve it here: ${link}` : "") + ` Questions? Call us at (225) 304-5556.`;
   if(navigator.canShare && navigator.canShare({files:[file]})){
-    try{ await navigator.share({files:[file], title:`Viking Gates quote ${Q.number}`}); sent = true; }
+    try{ await navigator.share({files:[file], text: msg, title:`Viking Gates quote ${Q.number}`}); sent = true; }
     catch(e){ if(e && e.name==="AbortError"){ toast("Not sent"); return; } downloadFile(blob, file.name); sent = true; }
   } else { downloadFile(blob, file.name); sent = true; toast("PDF downloaded. Attach it to a text or email."); }
+  if(sent && Q.approval){ toast("Sent"); return; }
   if(sent){ if(prev==="Draft"){ Q.status="Sent"; $("c-status").value="Sent"; } await saveQuote(true); toast(CONN.url?"Sent and saved":"Sent and saved on this phone"); }
 };
 
