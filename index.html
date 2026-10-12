@@ -277,6 +277,13 @@ input:focus-visible,select:focus-visible,textarea:focus-visible,button:focus-vis
     <div class="block"><h2>Gate heights</h2><p class="hint">Dan picks a height on each gate opening. Add a price if a height costs more.</p><div class="pbtable" id="pb-heights"></div><button class="btn small" data-addrow="heights" style="align-self:flex-start">+ Height</button></div>
     <div class="block"><h2>Add-ons</h2><div class="pbtable" id="pb-addons"></div><button class="btn small" data-addrow="addons" style="align-self:flex-start">+ Add-on</button></div>
     <div class="block">
+      <h2>Message sent with quotes</h2>
+      <p class="hint">This text goes out with the PDF when you tap Send. Fill-ins: {first} first name, {name} full name, {link} approval link, {total} quote total, {quote} quote number.</p>
+      <label class="f">Message<textarea id="pb-msg" rows="6"></textarea></label>
+      <div class="label">Preview</div>
+      <p class="hint" id="pb-msg-preview" style="white-space:pre-wrap;color:var(--ink);border:1px solid var(--line);border-radius:8px;padding:10px 12px"></p>
+    </div>
+    <div class="block">
       <h2>Quote defaults</h2>
       <div class="grid2">
         <label class="f">Deposit (%)<input id="pb-deposit" class="num" inputmode="decimal"></label>
@@ -338,6 +345,7 @@ const DEFAULT_PB = {
   ],
   heights:[{id:"h4",name:"4 ft",price:0},{id:"h5",name:"5 ft",price:0},{id:"h6",name:"6 ft",price:0}],
   venmo:"", cardLink:"",
+  sendMsg:"Hi {first}, here's your quote from Viking Gates.\n\nYou can review and approve it here:\n{link}\n\nQuestions? Call or text us at (225) 304-5556.",
   deposit:50, valid:30,
   terms:"Pricing is for standard residential installation within our service area. Measurements and site conditions are confirmed before work begins; anything outside standard scope is explained and priced before it moves forward. A 50% deposit confirms the project, moves the gate into production and reserves the install date. The remaining balance is due the morning of installation before work begins."
 };
@@ -642,6 +650,19 @@ $("addrList").addEventListener("mousedown", e=>e.preventDefault());
 $("addrList").addEventListener("click", e=>{ const li = e.target.closest("li[data-i]"); if(li) pickSugg(+li.dataset.i); });
 $("c-address").addEventListener("blur", ()=>setTimeout(closeSugg, 150));
 
+/* ---------- message sent with quotes ---------- */
+function fillMessage(tpl, v){
+  // Drop any line that needs a link when there isn't one (phone not connected to the Sheet).
+  let lines = String(tpl).split("\n");
+  if(!v.link) lines = lines.filter((l,i,arr)=>!l.includes("{link}") && !(/:\s*$/.test(l) && (arr[i+1]||"").trim()==="{link}"));
+  let out = lines.join("\n").replace(/\{(first|name|link|total|quote)\}/g, (m,k)=>v[k]||"");
+  if(!v.first) out = out.replace(/^Hi\s*,\s*/,"Hi, ");
+  return out.replace(/\n{3,}/g,"\n\n").trim();
+}
+function previewMessage(){
+  $("pb-msg-preview").textContent = fillMessage($("pb-msg").value || DEFAULT_PB.sendMsg, {first:"Jane", name:"Jane Doe", link:(location.origin + location.pathname.replace(/[^/]*$/,"")) + "approve?c=k3x9m2pq", total:"$3,895", quote:"VG-261012-0930"});
+}
+
 /* ---------- site photos ---------- */
 function renderPhotos(){
   const ph = Q.photos||[];
@@ -928,7 +949,7 @@ $("sendPdf").onclick = async ()=>{
   if(!Q.token) Q.token = newToken();
   const link = Q.approval ? "" : approvalLink();
   const first = (Q.customer.name||"").trim().split(/\s+/)[0];
-  const msg = `Hi ${first}, here's your quote from Viking Gates.` + (link ? ` You can review and approve it here: ${link}` : "") + ` Questions? Call us at (225) 304-5556.`;
+  const msg = fillMessage(PB.sendMsg || DEFAULT_PB.sendMsg, {first, name:(Q.customer.name||"").trim(), link, total:money(calc(Q).total), quote:Q.number});
   if(navigator.canShare && navigator.canShare({files:[file]})){
     try{ await navigator.share({files:[file], text: msg, title:`Viking Gates quote ${Q.number}`}); sent = true; }
     catch(e){ if(e && e.name==="AbortError"){ toast("Not sent"); return; } downloadFile(blob, file.name); sent = true; }
@@ -948,6 +969,7 @@ function renderCheck(){
 function renderPB(){
   for(const id in PB_FIELDS) $(id).value = PB[PB_FIELDS[id]];
   $("pb-terms").value = PB.terms; $("pb-mapskey").value = PB.mapsKey || "";
+  $("pb-msg").value = PB.sendMsg || DEFAULT_PB.sendMsg; previewMessage();
   ["addons","heights"].forEach(k=>{ $("pb-"+k).innerHTML = (PB[k]||[]).map((it,i)=>`<div class="pbrow">
       <input value="${esc(it.name)}" data-pb="${k}" data-i="${i}" data-k="name" aria-label="Name">
       <span class="money">$<input class="num" inputmode="decimal" value="${esc(it.price)}" data-pb="${k}" data-i="${i}" data-k="price" aria-label="Price"></span>
@@ -961,6 +983,7 @@ $("p-prices").addEventListener("input", e=>{
   if(k){ const it = PB[k][+t.dataset.i]; it[t.dataset.k] = t.dataset.k==="name" ? t.value : num(t.value); return; }
   if(PB_FIELDS[t.id]){ PB[PB_FIELDS[t.id]] = num(t.value); renderCheck(); }
   if(t.id==="pb-terms") PB.terms = t.value;
+  if(t.id==="pb-msg"){ PB.sendMsg = t.value; previewMessage(); }
   if(t.id==="pb-mapskey") PB.mapsKey = t.value.trim();
   if(t.id==="pb-venmo") PB.venmo = t.value.trim().replace(/^@/,"");
   if(t.id==="pb-cardlink") PB.cardLink = t.value.trim();
