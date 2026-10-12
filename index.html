@@ -696,7 +696,8 @@ let tt=null; function toast(m){ const el=$("toast"); el.textContent=m; el.hidden
 /* ---------- boot ---------- */
 $("logoL").src = LOGO_BLACK; $("logoD").src = LOGO_WHITE;
 const fromLink = readSetupLink();
-Q = LS.get(K.draft) || exampleQuote();
+const savedDraft = LS.get(K.draft);
+Q = (savedDraft && !savedDraft.example) ? savedDraft : blankQuote();
 renderCatalog(); bindCustomer(); renderLines(); renderSaved(); syncLabel(); showBanner();
 pull(false).then(ok=>{ if(fromLink) toast(ok?"Connected to the Viking Gates quote sheet":"Setup link saved, but the sheet didn't answer. Try ↻ later."); });
 document.addEventListener("visibilitychange", ()=>{ if(document.visibilityState==="visible") pull(false); });
