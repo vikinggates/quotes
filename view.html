@@ -63,6 +63,11 @@ input:focus-visible,.btn:focus-visible{outline:2px solid var(--accent);outline-o
 .note.ok{background:var(--ok-bg);color:var(--ink);border:1px solid var(--ok)}
 .note.ok strong{color:var(--ok)}
 .note.warn{background:var(--warn-bg);border:1px solid var(--warn)}
+.pay{border:1px solid var(--ink);border-radius:10px;padding:20px;display:flex;flex-direction:column;gap:12px}
+.pay .amt{font-family:var(--display);font-size:1.8rem;font-variant-numeric:tabular-nums}
+.paybtns{display:flex;gap:10px;flex-wrap:wrap}
+a.btn{text-decoration:none;display:inline-block;text-align:center}
+a.btn.alt{background:transparent;color:var(--ink)}
 .err{color:var(--warn);font-size:.9rem;min-height:1.2em}
 .center{text-align:center;color:var(--muted);padding:40px 0}
 .foot{font-size:.8rem;color:var(--muted);text-align:center;border-top:1px solid var(--line);padding-top:16px}
@@ -99,6 +104,14 @@ input:focus-visible,.btn:focus-visible{outline:2px solid var(--accent);outline-o
     <div id="approvedNote" class="note ok" hidden></div>
     <div id="closedNote" class="note warn" hidden></div>
 
+    <div class="pay" id="payBox" hidden>
+      <h2>Pay your deposit</h2>
+      <div class="amt" id="payAmt"></div>
+      <p class="prose" style="margin:0">Your deposit reserves your installation date. Include your quote number in the payment note so we can match it.</p>
+      <div class="paybtns"><a class="btn" id="venmoBtn" target="_blank" rel="noopener" hidden>Pay with Venmo</a><a class="btn alt" id="cardBtn" target="_blank" rel="noopener" hidden>Pay by card</a></div>
+      <p class="prose" style="margin:0" id="venmoHelp" hidden></p>
+    </div>
+
     <form class="approve" id="approveForm" hidden novalidate>
       <h2>Approve this quote</h2>
       <label class="f">Your full name<input type="text" id="sigName" autocomplete="name" required></label>
@@ -129,7 +142,7 @@ async function call(body){
   return r.json();
 }
 
-function render(q, terms){
+function render(q, terms, pay){
   $("cName").textContent = q.customer?.name || "";
   $("cAddr").textContent = q.customer?.address || "";
   const created = new Date(q.createdAt || Date.now());
@@ -164,12 +177,32 @@ function render(q, terms){
   $("terms").textContent = terms || "";
 
   const expired = Date.now() > until.getTime();
-  $("approveForm").hidden = true; $("approvedNote").hidden = true; $("closedNote").hidden = true;
+  $("approveForm").hidden = true; $("approvedNote").hidden = true; $("closedNote").hidden = true; $("payBox").hidden = true;
+  const PAID = ["Deposit paid","Scheduled","Installed"];
   if(q.approval){
     $("approvedNote").innerHTML = "";
     const s = document.createElement("strong"); s.textContent = "Approved. ";
-    $("approvedNote").append(s, document.createTextNode(`${q.approval.name} approved this quote on ${fd(new Date(q.approval.at))}. Thank you! We'll be in touch about the deposit and your installation date. Questions? Call ${PHONE}.`));
+    let msg = `${q.approval.name} approved this quote on ${fd(new Date(q.approval.at))}. Thank you!`;
+    if(PAID.includes(q.status)){
+      msg += " We've received your deposit.";
+      if(q.installDate){ const [y,m,d] = q.installDate.split("-").map(Number); msg += ` Your installation is scheduled for ${new Date(y,m-1,d).toLocaleDateString("en-US",{weekday:"long",month:"long",day:"numeric"})}.`; }
+      else msg += " We'll be in touch to schedule your installation.";
+    } else msg += ` We'll be in touch about the deposit and your installation date.`;
+    $("approvedNote").append(s, document.createTextNode(msg + ` Questions? Call ${PHONE}.`));
     $("approvedNote").hidden = false;
+    pay = pay || {};
+    if(!PAID.includes(q.status) && q.status!=="Lost" && (pay.venmo || pay.cardLink)){
+      $("payAmt").textContent = money2(dep);
+      const note = `Viking Gates deposit, quote ${q.number}`;
+      if(pay.venmo){
+        $("venmoBtn").href = `https://venmo.com/${encodeURIComponent(pay.venmo)}?txn=pay&amount=${dep.toFixed(2)}&note=${encodeURIComponent(note)}`;
+        $("venmoBtn").hidden = false;
+        $("venmoHelp").textContent = `Paying to @${pay.venmo}. If the amount doesn't fill in, enter ${money2(dep)} and add "${q.number}" to the note.`;
+        $("venmoHelp").hidden = false;
+      }
+      if(/^https:\/\//.test(pay.cardLink||"")){ $("cardBtn").href = pay.cardLink; $("cardBtn").hidden = false; }
+      $("payBox").hidden = false;
+    }
   } else if(q.status==="Lost"){
     $("closedNote").textContent = `This quote is no longer active. Call us at ${PHONE} and we'll put together an updated one.`; $("closedNote").hidden = false;
   } else if(expired){
@@ -181,7 +214,7 @@ function render(q, terms){
   $("loading").hidden = true; $("quote").hidden = false;
 }
 function openingSub(l){
-  const leaves = l.swing==="single" ? "One steel leaf" : "Two steel leaves";
+  const leaves = l.swing==="single" ? "One black steel leaf" : "Two black steel leaves";
   return `${leaves} with posts, hinges, latch, professional installation and haul-away of any old gate${l.auto?"; solar-powered opener system included":""}`;
 }
 
@@ -192,7 +225,7 @@ async function load(){
     if(!j.ok) return problem(j.error==="not_found"
       ? `We couldn't find this quote. If you just received it, wait a minute and refresh this page. Still stuck? Call us at ${PHONE}.`
       : `Something went wrong loading your quote. Please refresh, or call us at ${PHONE}.`);
-    render(j.quote, j.terms);
+    render(j.quote, j.terms, j.pay);
   }catch(e){ problem(`We couldn't load your quote. Check your connection and refresh, or call us at ${PHONE}.`); }
 }
 
@@ -205,7 +238,7 @@ $("approveForm").addEventListener("submit", async e=>{
   $("approveBtn").disabled = true; $("approveBtn").textContent = "Approving…";
   try{
     const j = await call({action:"approve", number, token, name});
-    if(j.ok){ await load(); window.scrollTo({top: $("approvedNote").offsetTop - 20, behavior:"smooth"}); return; }
+    if(j.ok){ await load(); const target = $("payBox").hidden ? $("approvedNote") : $("payBox"); window.scrollTo({top: target.offsetTop - 20, behavior:"smooth"}); return; }
     const msgs = {expired:`This quote has expired. Call us at ${PHONE} for an updated quote.`, withdrawn:`This quote is no longer active. Call us at ${PHONE}.`, name_required:"Type your full name to approve."};
     $("formErr").textContent = msgs[j.error] || `We couldn't record your approval. Please try again or call us at ${PHONE}.`;
   }catch(err){ $("formErr").textContent = "No connection. Check your signal and try again."; }
