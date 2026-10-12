@@ -128,7 +128,8 @@ a.btn.alt{background:transparent;color:var(--ink)}
 (function(){
 const $ = id => document.getElementById(id);
 const P = new URLSearchParams(location.search);
-const number = P.get("q"), token = P.get("t"), sid = P.get("s");
+const DEFAULT_SID = "AKfycbzLWHEGbkHnf3bd9PtSz74L2p1Esd6IE6CESX7nPL5kxcyYpFfsx_4k1O0lGBlkHYZ4";
+const code = P.get("c"), number = P.get("q"), token = P.get("t"), sid = P.get("s") || DEFAULT_SID;
 const API = sid ? `https://script.google.com/macros/s/${encodeURIComponent(sid)}/exec` : "";
 const num = v => { const n = parseFloat(String(v).replace(/[^0-9.\-]/g,"")); return isFinite(n)?n:0; };
 const r2 = n => Math.round(n*100)/100;
@@ -219,9 +220,9 @@ function openingSub(l){
 }
 
 async function load(){
-  if(!number || !token || !API) return problem(`This link is incomplete. Please use the full link from your text or email, or call us at ${PHONE}.`);
+  if(!code && (!number || !token)) return problem(`This link is incomplete. Please use the full link from your text or email, or call us at ${PHONE}.`);
   try{
-    const j = await call({action:"view", number, token});
+    const j = await call({action:"view", number, token, code});
     if(!j.ok) return problem(j.error==="not_found"
       ? `We couldn't find this quote. If you just received it, wait a minute and refresh this page. Still stuck? Call us at ${PHONE}.`
       : `Something went wrong loading your quote. Please refresh, or call us at ${PHONE}.`);
@@ -237,7 +238,7 @@ $("approveForm").addEventListener("submit", async e=>{
   if(!$("agree").checked){ $("formErr").textContent = "Check the box to accept the quote and terms."; return; }
   $("approveBtn").disabled = true; $("approveBtn").textContent = "Approving…";
   try{
-    const j = await call({action:"approve", number, token, name});
+    const j = await call({action:"approve", number, token, code, name});
     if(j.ok){ await load(); const target = $("payBox").hidden ? $("approvedNote") : $("payBox"); window.scrollTo({top: target.offsetTop - 20, behavior:"smooth"}); return; }
     const msgs = {expired:`This quote has expired. Call us at ${PHONE} for an updated quote.`, withdrawn:`This quote is no longer active. Call us at ${PHONE}.`, name_required:"Type your full name to approve."};
     $("formErr").textContent = msgs[j.error] || `We couldn't record your approval. Please try again or call us at ${PHONE}.`;

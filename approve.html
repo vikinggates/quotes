@@ -1,0 +1,253 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Your Viking Gates Quote</title>
+<meta name="robots" content="noindex,nofollow">
+<link rel="icon" type="image/png" href="icon-192.png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=Jost:wght@400;500;600&display=swap">
+<style>
+/* Layout: a single letterhead-style sheet, quote first, approval panel at the end */
+:root{
+  color-scheme:light;
+  --bg:#eef0f0; --paper:#ffffff; --ink:#131517; --muted:#5b6166; --line:#d8dbdd;
+  --accent:#7d5f33; --ok:#2f6b45; --ok-bg:#e8f2ec; --warn:#a4561a; --warn-bg:#f8eee4;
+  --lg-l:block; --lg-d:none;
+  --display:"Playfair Display", Georgia, "Times New Roman", serif;
+  --body:"Jost", "Avenir Next", "Segoe UI", system-ui, sans-serif;
+}
+@media (prefers-color-scheme: dark){:root{
+  --bg:#0f1112; --paper:#181b1d; --ink:#eceeef; --muted:#9aa1a6; --line:#2b3034;
+  --accent:#c7a067; --ok:#7cc39a; --ok-bg:#1b2a22; --warn:#e09a5c; --warn-bg:#2e2219;
+  --lg-l:none; --lg-d:block; color-scheme:dark}}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--body);font-size:16px;line-height:1.5;padding-inline:16px;padding-block:calc(20px + env(safe-area-inset-top,0px)) calc(40px + env(safe-area-inset-bottom,0px))}
+[hidden]{display:none!important}
+.sheet{max-width:760px;margin:0 auto;background:var(--paper);border:1px solid var(--line);border-radius:12px;padding:28px clamp(18px,5vw,44px);display:flex;flex-direction:column;gap:26px}
+.head{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;flex-wrap:wrap;border-bottom:2px solid var(--ink);padding-bottom:18px}
+.logo{width:170px;max-width:100%;height:auto}
+.logo-l{display:var(--lg-l)}.logo-d{display:var(--lg-d)}
+.contact{font-size:.85rem;color:var(--muted);text-align:right;line-height:1.5}
+.contact .tag{font-size:.7rem;letter-spacing:.14em;text-transform:uppercase;margin-top:6px}
+h1{font-family:var(--display);font-size:2rem;margin:0;line-height:1.1}
+h2{font-family:var(--display);font-size:1.3rem;margin:0}
+.label{font-size:.72rem;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+.meta{display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap;align-items:flex-end}
+.meta .facts{font-size:.9rem;color:var(--muted);text-align:right;font-variant-numeric:tabular-nums}
+.for .name{font-weight:600;font-size:1.1rem}
+.for .sub{color:var(--muted);font-size:.95rem}
+.items{display:flex;flex-direction:column}
+.item{display:grid;grid-template-columns:1fr auto;gap:4px 16px;padding:14px 0;border-top:1px solid var(--line)}
+.item:first-child{border-top:2px solid var(--ink)}
+.item .t{font-weight:600}
+.item .d{grid-column:1;color:var(--muted);font-size:.88rem}
+.item .q{grid-column:1;font-size:.85rem;color:var(--muted);font-variant-numeric:tabular-nums}
+.item .a{grid-row:1;grid-column:2;font-weight:600;font-variant-numeric:tabular-nums;text-align:right}
+.totals{display:grid;grid-template-columns:1fr auto;gap:6px 16px;font-variant-numeric:tabular-nums;max-width:360px;margin-left:auto;width:100%}
+.totals .t{font-weight:700;font-size:1.25rem;border-top:2px solid var(--ink);padding-top:8px;font-family:var(--display)}
+.totals .m{color:var(--muted)}
+.prose{color:var(--muted);font-size:.9rem;margin:6px 0 0;white-space:pre-wrap}
+.approve{border:1px solid var(--ink);border-radius:10px;padding:20px;display:flex;flex-direction:column;gap:14px}
+label.f{display:flex;flex-direction:column;gap:6px;font-size:.85rem;color:var(--muted)}
+input[type=text]{font:inherit;font-size:17px;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:11px 12px;width:100%}
+.check{display:flex;gap:10px;align-items:flex-start;font-size:.95rem}
+.check input{width:22px;height:22px;margin-top:2px;flex:none;accent-color:var(--ink)}
+.btn{font:inherit;font-weight:600;font-size:1rem;border-radius:999px;padding:13px 22px;border:1px solid var(--ink);background:var(--ink);color:var(--paper);cursor:pointer}
+.btn:disabled{opacity:.4;cursor:default}
+input:focus-visible,.btn:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.note{border-radius:10px;padding:16px 18px;font-size:.95rem}
+.note.ok{background:var(--ok-bg);color:var(--ink);border:1px solid var(--ok)}
+.note.ok strong{color:var(--ok)}
+.note.warn{background:var(--warn-bg);border:1px solid var(--warn)}
+.pay{border:1px solid var(--ink);border-radius:10px;padding:20px;display:flex;flex-direction:column;gap:12px}
+.pay .amt{font-family:var(--display);font-size:1.8rem;font-variant-numeric:tabular-nums}
+.paybtns{display:flex;gap:10px;flex-wrap:wrap}
+a.btn{text-decoration:none;display:inline-block;text-align:center}
+a.btn.alt{background:transparent;color:var(--ink)}
+.err{color:var(--warn);font-size:.9rem;min-height:1.2em}
+.center{text-align:center;color:var(--muted);padding:40px 0}
+.foot{font-size:.8rem;color:var(--muted);text-align:center;border-top:1px solid var(--line);padding-top:16px}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<main class="sheet">
+  <div class="head">
+    <div><img class="logo logo-l" src="logo-black.png" alt="Viking Gates"><img class="logo logo-d" src="logo-white.png" alt="Viking Gates"></div>
+    <div class="contact">Viking Gates, LLC<br>(225) 304-5556<br>info@vikinggates.com<br>vikinggates.com<div class="tag">Built to Swing. Built to Last.</div></div>
+  </div>
+
+  <div id="loading" class="center">Loading your quote…</div>
+  <div id="problem" class="note warn" hidden></div>
+
+  <div id="quote" hidden style="display:flex;flex-direction:column;gap:26px">
+    <div class="meta">
+      <div class="for">
+        <h1>Quote</h1>
+        <div class="label" style="margin-top:14px">Prepared for</div>
+        <div class="name" id="cName"></div>
+        <div class="sub" id="cAddr"></div>
+      </div>
+      <div class="facts" id="facts"></div>
+    </div>
+
+    <div class="items" id="items"></div>
+    <div class="totals" id="totals"></div>
+
+    <div id="notesBox" hidden><div class="label">Project notes</div><p class="prose" id="notes"></p></div>
+    <div><div class="label">Terms</div><p class="prose" id="terms"></p></div>
+
+    <div id="approvedNote" class="note ok" hidden></div>
+    <div id="closedNote" class="note warn" hidden></div>
+
+    <div class="pay" id="payBox" hidden>
+      <h2>Pay your deposit</h2>
+      <div class="amt" id="payAmt"></div>
+      <p class="prose" style="margin:0">Your deposit reserves your installation date. Include your quote number in the payment note so we can match it.</p>
+      <div class="paybtns"><a class="btn" id="venmoBtn" target="_blank" rel="noopener" hidden>Pay with Venmo</a><a class="btn alt" id="cardBtn" target="_blank" rel="noopener" hidden>Pay by card</a></div>
+      <p class="prose" style="margin:0" id="venmoHelp" hidden></p>
+    </div>
+
+    <form class="approve" id="approveForm" hidden novalidate>
+      <h2>Approve this quote</h2>
+      <label class="f">Your full name<input type="text" id="sigName" autocomplete="name" required></label>
+      <label class="check"><input type="checkbox" id="agree"><span>I accept this quote and the terms above, and I understand a <span id="depPct">50%</span> deposit is due to schedule the installation.</span></label>
+      <div class="err" id="formErr" role="alert"></div>
+      <div><button class="btn" id="approveBtn" type="submit">Approve quote</button></div>
+    </form>
+  </div>
+
+  <div class="foot">Viking Gates, LLC · Locally owned · Serving the Greater Baton Rouge area</div>
+</main>
+
+<script>
+(function(){
+const $ = id => document.getElementById(id);
+const P = new URLSearchParams(location.search);
+const DEFAULT_SID = "AKfycbzLWHEGbkHnf3bd9PtSz74L2p1Esd6IE6CESX7nPL5kxcyYpFfsx_4k1O0lGBlkHYZ4";
+const code = P.get("c"), number = P.get("q"), token = P.get("t"), sid = P.get("s") || DEFAULT_SID;
+const API = sid ? `https://script.google.com/macros/s/${encodeURIComponent(sid)}/exec` : "";
+const num = v => { const n = parseFloat(String(v).replace(/[^0-9.\-]/g,"")); return isFinite(n)?n:0; };
+const r2 = n => Math.round(n*100)/100;
+const money2 = n => (n<0?"-":"")+"$"+Math.abs(n).toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:2});
+const fd = d => d.toLocaleDateString("en-US",{month:"long",day:"numeric",year:"numeric"});
+const PHONE = "(225) 304-5556";
+
+function problem(msg){ $("loading").hidden = true; $("quote").hidden = true; const p=$("problem"); p.textContent = msg; p.hidden = false; }
+async function call(body){
+  const r = await fetch(API, {method:"POST", body: JSON.stringify(body)});
+  return r.json();
+}
+
+function render(q, terms, pay){
+  $("cName").textContent = q.customer?.name || "";
+  $("cAddr").textContent = q.customer?.address || "";
+  const created = new Date(q.createdAt || Date.now());
+  const until = new Date(created.getTime() + num(q.validDays||30)*864e5);
+  $("facts").innerHTML = "";
+  [`Quote no. ${q.number}`, `Date: ${fd(created)}`, `Valid until: ${fd(until)}`].forEach(t=>{ const d=document.createElement("div"); d.textContent=t; $("facts").appendChild(d); });
+
+  const items = $("items"); items.innerHTML = "";
+  (q.lines||[]).forEach(l=>{
+    const row = document.createElement("div"); row.className = "item";
+    const t = document.createElement("div"); t.className="t"; t.textContent = l.label || l.name || "Item";
+    const a = document.createElement("div"); a.className="a"; a.textContent = money2(num(l.qty)*num(l.unit));
+    row.append(t, a);
+    const sub = l.kind==="opening" ? openingSub(l) : (l.desc||"");
+    if(sub){ const d=document.createElement("div"); d.className="d"; d.textContent=sub; row.appendChild(d); }
+    if(num(l.qty)!==1){ const qd=document.createElement("div"); qd.className="q"; qd.textContent = `${l.qty} × ${money2(num(l.unit))}`; row.appendChild(qd); }
+    items.appendChild(row);
+  });
+
+  const sub = r2((q.lines||[]).reduce((s,l)=>s+num(l.qty)*num(l.unit),0));
+  const disc = Math.min(Math.max(num(q.discount),0), sub);
+  const total = r2(sub-disc), dep = r2(total*num(q.depositPct)/100);
+  $("totals").innerHTML = "";
+  const row = (a,b,cls)=>{ const x=document.createElement("span"), y=document.createElement("span"); x.textContent=a; y.textContent=b; if(cls){x.className=cls;y.className=cls;} $("totals").append(x,y); };
+  if(disc){ row("Subtotal", money2(sub)); row("Discount", "−"+money2(disc)); }
+  row("Total", money2(total), "t");
+  row(`Deposit to schedule (${num(q.depositPct)}%)`, money2(dep), "m");
+  row("Balance due morning of install", money2(r2(total-dep)), "m");
+  $("depPct").textContent = `${num(q.depositPct)}%`;
+
+  if(q.notes){ $("notes").textContent = q.notes; $("notesBox").hidden = false; }
+  $("terms").textContent = terms || "";
+
+  const expired = Date.now() > until.getTime();
+  $("approveForm").hidden = true; $("approvedNote").hidden = true; $("closedNote").hidden = true; $("payBox").hidden = true;
+  const PAID = ["Deposit paid","Scheduled","Installed"];
+  if(q.approval){
+    $("approvedNote").innerHTML = "";
+    const s = document.createElement("strong"); s.textContent = "Approved. ";
+    let msg = `${q.approval.name} approved this quote on ${fd(new Date(q.approval.at))}. Thank you!`;
+    if(PAID.includes(q.status)){
+      msg += " We've received your deposit.";
+      if(q.installDate){ const [y,m,d] = q.installDate.split("-").map(Number); msg += ` Your installation is scheduled for ${new Date(y,m-1,d).toLocaleDateString("en-US",{weekday:"long",month:"long",day:"numeric"})}.`; }
+      else msg += " We'll be in touch to schedule your installation.";
+    } else msg += ` We'll be in touch about the deposit and your installation date.`;
+    $("approvedNote").append(s, document.createTextNode(msg + ` Questions? Call ${PHONE}.`));
+    $("approvedNote").hidden = false;
+    pay = pay || {};
+    if(!PAID.includes(q.status) && q.status!=="Lost" && (pay.venmo || pay.cardLink)){
+      $("payAmt").textContent = money2(dep);
+      const note = `Viking Gates deposit, quote ${q.number}`;
+      if(pay.venmo){
+        $("venmoBtn").href = `https://venmo.com/${encodeURIComponent(pay.venmo)}?txn=pay&amount=${dep.toFixed(2)}&note=${encodeURIComponent(note)}`;
+        $("venmoBtn").hidden = false;
+        $("venmoHelp").textContent = `Paying to @${pay.venmo}. If the amount doesn't fill in, enter ${money2(dep)} and add "${q.number}" to the note.`;
+        $("venmoHelp").hidden = false;
+      }
+      if(/^https:\/\//.test(pay.cardLink||"")){ $("cardBtn").href = pay.cardLink; $("cardBtn").hidden = false; }
+      $("payBox").hidden = false;
+    }
+  } else if(q.status==="Lost"){
+    $("closedNote").textContent = `This quote is no longer active. Call us at ${PHONE} and we'll put together an updated one.`; $("closedNote").hidden = false;
+  } else if(expired){
+    $("closedNote").textContent = `This quote expired on ${fd(until)}. Call us at ${PHONE} and we'll get you an updated quote.`; $("closedNote").hidden = false;
+  } else {
+    $("approveForm").hidden = false;
+    if(q.customer?.name) $("sigName").placeholder = q.customer.name;
+  }
+  $("loading").hidden = true; $("quote").hidden = false;
+}
+function openingSub(l){
+  const leaves = l.swing==="single" ? "One black steel leaf" : "Two black steel leaves";
+  return `${leaves} with posts, hinges, latch, professional installation and haul-away of any old gate${l.auto?"; solar-powered opener system included":""}`;
+}
+
+async function load(){
+  if(!code && (!number || !token)) return problem(`This link is incomplete. Please use the full link from your text or email, or call us at ${PHONE}.`);
+  try{
+    const j = await call({action:"view", number, token, code});
+    if(!j.ok) return problem(j.error==="not_found"
+      ? `We couldn't find this quote. If you just received it, wait a minute and refresh this page. Still stuck? Call us at ${PHONE}.`
+      : `Something went wrong loading your quote. Please refresh, or call us at ${PHONE}.`);
+    render(j.quote, j.terms, j.pay);
+  }catch(e){ problem(`We couldn't load your quote. Check your connection and refresh, or call us at ${PHONE}.`); }
+}
+
+$("approveForm").addEventListener("submit", async e=>{
+  e.preventDefault();
+  const name = $("sigName").value.trim();
+  $("formErr").textContent = "";
+  if(name.length < 2){ $("formErr").textContent = "Type your full name to approve."; $("sigName").focus(); return; }
+  if(!$("agree").checked){ $("formErr").textContent = "Check the box to accept the quote and terms."; return; }
+  $("approveBtn").disabled = true; $("approveBtn").textContent = "Approving…";
+  try{
+    const j = await call({action:"approve", number, token, code, name});
+    if(j.ok){ await load(); const target = $("payBox").hidden ? $("approvedNote") : $("payBox"); window.scrollTo({top: target.offsetTop - 20, behavior:"smooth"}); return; }
+    const msgs = {expired:`This quote has expired. Call us at ${PHONE} for an updated quote.`, withdrawn:`This quote is no longer active. Call us at ${PHONE}.`, name_required:"Type your full name to approve."};
+    $("formErr").textContent = msgs[j.error] || `We couldn't record your approval. Please try again or call us at ${PHONE}.`;
+  }catch(err){ $("formErr").textContent = "No connection. Check your signal and try again."; }
+  $("approveBtn").disabled = false; $("approveBtn").textContent = "Approve quote";
+});
+
+load();
+})();
+</script>
+</body>
+</html>

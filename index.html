@@ -148,7 +148,7 @@ input:focus-visible,select:focus-visible,textarea:focus-visible,button:focus-vis
     <button role="tab" aria-selected="true" data-tab="quote">Quote</button>
     <button role="tab" aria-selected="false" data-tab="saved">Saved</button>
     <button role="tab" aria-selected="false" data-tab="numbers">Numbers</button>
-    <button role="tab" aria-selected="false" data-tab="prices">Prices</button>
+    <button role="tab" aria-selected="false" data-tab="prices">Settings</button>
   </nav>
 
   <!-- QUOTE -->
@@ -284,18 +284,18 @@ input:focus-visible,select:focus-visible,textarea:focus-visible,button:focus-vis
       </div>
       <label class="f">Terms printed on every quote<textarea id="pb-terms"></textarea></label>
     </div>
-    <div class="row"><button class="btn solid" id="pb-save">Save prices</button><button class="btn" id="pb-reset">Restore starting prices</button></div>
-    <p class="hint" id="pb-confirm" hidden>Restore every price to the starting values? <button class="btn small" id="pb-reset-yes">Yes, restore</button> <button class="btn small" id="pb-reset-no">Cancel</button></p>
+    <div class="row"><button class="btn solid" id="pb-save">Save settings</button><button class="btn" id="pb-reset">Restore starting prices</button></div>
+    <p class="hint" id="pb-confirm" hidden>Restore every price and setting to the starting values? <button class="btn small" id="pb-reset-yes">Yes, restore</button> <button class="btn small" id="pb-reset-no">Cancel</button></p>
 
     <div class="block" id="payBlock">
       <h2>Deposit payments</h2>
-      <p class="hint">After a customer approves online, their page shows a button to pay the deposit. Tap Save prices to apply.</p>
+      <p class="hint">After a customer approves online, their page shows a button to pay the deposit. Tap Save settings to apply.</p>
       <label class="f">Venmo username<input id="pb-venmo" placeholder="@your-venmo" autocomplete="off" autocapitalize="off" spellcheck="false"></label>
       <label class="f">Card payment link (optional)<input id="pb-cardlink" placeholder="https://…" autocomplete="off" autocapitalize="off" spellcheck="false"></label>
     </div>
     <div class="block">
       <h2>Address lookup</h2>
-      <p class="hint">Paste your Google Maps API key to suggest addresses as you type. Tap Save prices to share it with Dan's phone. Leave it blank to type addresses by hand.</p>
+      <p class="hint">Paste your Google Maps API key to suggest addresses as you type. Tap Save settings to share it with Dan's phone. Leave it blank to type addresses by hand.</p>
       <label class="f">Google Maps API key<input id="pb-mapskey" autocomplete="off" autocapitalize="off" spellcheck="false"></label>
     </div>
     <div class="block">
@@ -323,6 +323,7 @@ const LOGO_PDF="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAA4QAAAHsCAYAAACKdm
 const LOGO_RATIO=0.5466666666666666;
 
 const PAYMENTS = /*PAYMENTS*/false;
+const LINK_SCRIPT_ID = "AKfycbzLWHEGbkHnf3bd9PtSz74L2p1Esd6IE6CESX7nPL5kxcyYpFfsx_4k1O0lGBlkHYZ4";
 (function(){
 const DEFAULT_PB = {
   manual:2695, arch:800, auto:1200, std:16, perFt:250, singleMax:16,
@@ -397,7 +398,7 @@ async function pull(showToast){
     syncLabel(); renderSaved(); if(showToast) toast("Up to date");
     return true;
   }catch(e){
-    if(String(e.message)==="bad_key") setSync("Wrong passcode. Check the Prices tab.", true);
+    if(String(e.message)==="bad_key") setSync("Wrong passcode. Check the Settings tab.", true);
     else setSync(pending.length?`Offline. ${pending.length} waiting to sync`:"Offline. Showing last copy", true);
     renderSaved(); return false;
   }
@@ -433,7 +434,7 @@ function calc(q){
 
 /* ---------- quote state ---------- */
 function newNumber(){ const d=new Date(), p=n=>String(n).padStart(2,"0"); return `VG-${String(d.getFullYear()).slice(2)}${p(d.getMonth()+1)}${p(d.getDate())}-${p(d.getHours())}${p(d.getMinutes())}${p(d.getSeconds())}`; }
-function newToken(){ const a=new Uint8Array(12); crypto.getRandomValues(a); return Array.from(a,b=>b.toString(36).padStart(2,"0")).join("").slice(0,20); }
+function newToken(){ const abc="abcdefghjkmnpqrstuvwxyz23456789", a=new Uint8Array(8); crypto.getRandomValues(a); return Array.from(a,b=>abc[b%abc.length]).join(""); }
 function blankQuote(){ return {number:newNumber(), token:newToken(), createdAt:Date.now(), status:"Draft", customer:{name:"",phone:"",email:"",address:""}, notes:"", lines:[], discount:0, depositPct:PB.deposit, validDays:PB.valid, example:false}; }
 function openingLine(o){ const l = Object.assign({id:uid(), kind:"opening", width:PB.std, swing:"double", top:"flat", auto:false, height:"", qty:1, override:false}, o||{}); l.unit = openingPrice(l).price; return l; }
 function itemLine(it){ return {id:uid(), kind:"item", name:it.name, desc:it.desc||"", qty:1, unit:num(it.price)}; }
@@ -586,7 +587,7 @@ function loadGoogle(key){
   return AD.loading;
 }
 function initAddress(){ if(PB.mapsKey && !AD.loading) loadGoogle(PB.mapsKey).catch(()=>{}); }
-window.gm_authFailure = ()=>{ AD.ready=false; closeSugg(); toast("Address lookup is off: Google rejected the API key. Check it on the Prices tab."); };
+window.gm_authFailure = ()=>{ AD.ready=false; closeSugg(); toast("Address lookup is off: Google rejected the API key. Check it on the Settings tab."); };
 function closeSugg(){ $("addrList").hidden = true; $("c-address").setAttribute("aria-expanded","false"); AD.items=[]; AD.active=-1; }
 function showSugg(){
   const ul = $("addrList");
@@ -769,6 +770,7 @@ function approvalLink(q){
   if(!scriptId()) return "";
   if(!q.token) q.token = newToken();
   const base = location.origin + location.pathname.replace(/[^/]*$/,"");
+  if(scriptId() === LINK_SCRIPT_ID) return `${base}approve?c=${q.token}`;
   return `${base}view.html?q=${encodeURIComponent(q.number)}&t=${q.token}&s=${scriptId()}`;
 }
 $("copyLink").onclick = async ()=>{
@@ -972,13 +974,13 @@ $("pb-save").onclick = async ()=>{
   PB.addons = PB.addons.filter(a=>a.name.trim()); PB.heights = (PB.heights||[]).filter(a=>a.name.trim());
   if(PB.cardLink && !/^https:\/\//.test(PB.cardLink)){ toast("The card payment link must start with https://"); return; }
   LS.set(K.pb,PB); renderCatalog(); renderPB(); initAddress();
-  if(!CONN.url){ toast("Prices saved on this phone"); return; }
-  try{ await api("savePrices",{prices:PB}); toast("Prices saved for everyone"); syncLabel(); }
+  if(!CONN.url){ toast("Settings saved on this phone"); return; }
+  try{ await api("savePrices",{prices:PB}); toast("Settings saved for everyone"); syncLabel(); }
   catch(e){ toast("Couldn't reach the Google Sheet. Saved on this phone only."); }
 };
 $("pb-reset").onclick = ()=>{ $("pb-confirm").hidden=false; };
 $("pb-reset-no").onclick = ()=>{ $("pb-confirm").hidden=true; };
-$("pb-reset-yes").onclick = ()=>{ PB = clone(DEFAULT_PB); renderPB(); $("pb-confirm").hidden=true; toast("Starting prices restored. Tap Save prices to keep them."); };
+$("pb-reset-yes").onclick = ()=>{ PB = clone(DEFAULT_PB); renderPB(); $("pb-confirm").hidden=true; toast("Starting prices restored. Tap Save settings to keep them."); };
 
 /* ---------- connection ---------- */
 function renderConn(){
